@@ -1,0 +1,96 @@
+package com.colin.map2gpx.gpx
+
+import android.content.Context
+import android.util.Xml
+import com.colin.map2gpx.model.Waypoint
+import com.colin.map2gpx.util.IconResolver
+import org.xmlpull.v1.XmlPullParser
+import java.io.IOException
+
+/**
+ * Minimal GPX parser: extracts <wpt> latitude/longitude and optional <name>/<type>.
+ * Designed to be safe and explicit for Colin's workflow.
+ */
+class GpxParser {
+
+    fun parse(gpx: String): List<Waypoint> {
+        val waypoints = mutableListOf<Waypoint>()
+        val parser = Xml.newPullParser()
+        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+        parser.setInput(gpx.reader())
+
+        var event = parser.eventType
+        var currentTag: String? = null
+
+        // Temp holders for a waypoint
+        var lat: Double? = null
+        var lon: Double? = null
+        var name: String? = null
+        var type: String? = null
+        var insideWpt = false
+
+        while (event != XmlPullParser.END_DOCUMENT) {
+            when (event) {
+                XmlPullParser.START_TAG -> {
+                    currentTag = parser.name
+                    if (currentTag == "wpt") {
+                        insideWpt = true
+                        lat = parser.getAttributeValue(null, "lat")?.toDoubleOrNull()
+                        lon = parser.getAttributeValue(null, "lon")?.toDoubleOrNull()
+                        name = null
+                        type = null
+                    }
+                }
+                XmlPullParser.TEXT -> {
+                    val text = parser.text?.trim()
+                    if (insideWpt && !text.isNullOrEmpty()) {
+                        when (currentTag) {
+                            "name" -> name = text
+                            "type" -> type = text
+                        }
+                    }
+                }
+                XmlPullParser.END_TAG -> {
+                    val tagName = parser.name
+                    if (tagName == "wpt") {
+                        // finalize waypoint
+                        val finalLat = lat
+                        val finalLon = lon
+                        if (finalLat != null && finalLon != null) {
+                            val rawIconType = type ?: name
+                            val iconKey = IconResolver.resolveIconFor(rawIconType)
+
+                            waypoints.add(
+                                Waypoint(
+                                    latitude = finalLat,
+                                    longitude = finalLon,
+                                    iconType = iconKey
+                                )
+                            )
+                        }
+                        // reset
+                        insideWpt = false
+                        lat = null
+                        lon = null
+                        name = null
+                        type = null
+                    }
+                    currentTag = null
+                }
+            }
+            event = parser.next()
+        }
+
+        return waypoints
+    }
+
+    fun parseGpxFile(context: Context, assetFileName: String): List<Waypoint> {
+        return try {
+            val gpxData = context.assets.open(assetFileName).bufferedReader().use { it.readText() }
+            parse(gpxData)
+        } catch (e: IOException) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+}

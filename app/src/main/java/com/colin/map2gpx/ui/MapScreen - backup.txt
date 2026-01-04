@@ -1,0 +1,113 @@
+package com.colin.map2gpx.ui
+
+import android.util.Log
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import com.colin.map2gpx.gpx.ParserSmokeTest
+import com.colin.map2gpx.model.Waypoint
+import com.colin.map2gpx.util.IconResolver
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
+import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
+import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.SymbolLayer
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.Point
+
+@Composable
+fun MapScreen(waypoints: List<Waypoint>) {
+    val context = LocalContext.current
+
+    AndroidView(
+        factory = { ctx ->
+            MapView(ctx).apply {
+                getMapAsync { mapboxMap ->
+                    mapboxMap.setStyle(
+                        Style.Builder().fromUri("https://demotiles.maplibre.org/style.json")
+                    ) { style ->
+                        Log.d("MAP_TEST", "🚩 Style loaded successfully")
+
+                        // Register icons using Int drawable IDs from IconResolver
+                        listOf("tent","fuel","motorcycle","camera","wrench","food","hotel").forEach { iconKey ->
+                            val iconResId = IconResolver.resolveIconDrawable(iconKey)
+                            val drawable = ContextCompat.getDrawable(context, iconResId)
+                            if (drawable != null) {
+                                style.addImage(iconKey, drawable)  // (String, Drawable) overload
+                            }
+                        }
+
+                        // Build features from waypoints (string icon keys for SymbolLayer)
+                        val features = waypoints.map { wp ->
+                            Feature.fromGeometry(Point.fromLngLat(wp.longitude, wp.latitude)).apply {
+                                val iconKey = IconResolver.resolveIconFor(wp.iconType)
+                                addStringProperty("icon", iconKey)
+                            }
+                        }
+                        val featureCollection = FeatureCollection.fromFeatures(features)
+
+                        // Add source + layer
+                        style.addSource(GeoJsonSource("waypoints-source", featureCollection))
+                        style.addLayer(
+                            SymbolLayer("waypoints-layer", "waypoints-source").withProperties(
+                                iconImage("{icon}"),
+                                iconAllowOverlap(true),
+                                iconIgnorePlacement(true)
+                            )
+                        )
+
+                        Log.d("MAP_TEST", "🚩 Source added with ${features.size} features")
+
+                        // Move camera to first waypoint
+                        if (waypoints.isNotEmpty()) {
+                            val first = waypoints.first()
+                            val position = CameraPosition.Builder()
+                                .target(LatLng(first.latitude, first.longitude))
+                                .zoom(10.0)
+                                .build()
+                            mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(position))
+                            Log.d("MAP_TEST", "🚩 Camera moved to first waypoint")
+                        }
+                    }
+                }
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    )
+}
+
+@Composable
+fun DebugTools() {
+    Column {
+        Button(onClick = { ParserSmokeTest.run() }) {
+            Text("Run Parser Test")
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun MapScreenPreview() {
+    Column(modifier = Modifier.fillMaxSize()) {
+        MapScreen(
+            waypoints = listOf(
+                Waypoint(13.7563, 100.5018, "tent"),   // Bangkok dummy point
+                Waypoint(12.5657, 104.9910, "fuel")    // Phnom Penh dummy point
+            )
+        )
+        DebugTools()
+    }
+}

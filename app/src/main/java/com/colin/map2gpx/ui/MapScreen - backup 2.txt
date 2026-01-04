@@ -1,0 +1,59 @@
+package com.colin.map2gpx.ui
+
+import android.util.Log
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.colin.map2gpx.gpx.GpxParser
+import com.colin.map2gpx.model.Waypoint
+
+/**
+ * MapScreen: minimal onClick; parsing in a standalone function to avoid IR-lowering bugs.
+ * No Compose state; logs use static tags and minimal interpolation.
+ */
+@Composable
+fun MapScreen(
+    modifier: Modifier = Modifier,
+    sampleGpxXml: String? = null
+) {
+    Column(modifier = modifier.fillMaxSize()) {
+        Row(Modifier.padding(12.dp)) {
+            Button(onClick = {
+                Log.d("GPX", "Started: Debug load GPX")
+                val parsed = parseSampleGpx(sampleGpxXml)
+                // Minimal logging to avoid complex IR paths
+                Log.d("GPX", "Completed: Debug load GPX")
+                Log.d("GPX", "Count: " + parsed.size)
+            }) {
+                Text("Load GPX (Debug)")
+            }
+        }
+    }
+}
+
+private fun parseSampleGpx(sampleGpxXml: String?): List<Waypoint> {
+    val xml = sampleGpxXml ?: """
+        <gpx version="1.1" creator="SmokeTest">
+            <wpt lat="12.34" lon="56.78">
+                <name>Tent Site</name>
+                <type>camp</type>
+            </wpt>
+            <wpt lat="23.45" lon="67.89">
+                <name>Fuel Stop</name>
+                <type>fuel</type>
+            </wpt>
+        </gpx>
+    """.trimIndent()
+    return try {
+        GpxParser().parse(xml)
+    } catch (e: Exception) {
+        Log.e("GPX", "Parse error: " + e.message)
+        emptyList()
+    }
+}

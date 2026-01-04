@@ -1,0 +1,65 @@
+package com.colin.map2gpx.ui
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.viewinterop.AndroidView
+import com.colin.map2gpx.model.Waypoint
+import com.colin.map2gpx.ui.theme.Map2GpxTheme
+import com.colin.map2gpx.util.MapRenderer
+import com.colin.map2gpx.util.LogUtils
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.MapLibreMap
+
+class MapScreen : ComponentActivity() {
+
+    private lateinit var mapView: MapView
+    private lateinit var mapLibreMap: MapLibreMap
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        mapView = MapView(this)
+        mapView.onCreate(savedInstanceState)
+
+        setContent {
+            Map2GpxTheme {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // Map fills the screen
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = { mapView }
+                    )
+
+                    // DebugPanel anchored at the bottom
+                    DebugPanel(
+                        context = this@MapScreen,
+                        mapView = mapView,
+                        onWaypointsLoaded = { waypoints: List<Waypoint> ->
+                            MapRenderer.renderWaypoints(this@MapScreen, mapView, waypoints)
+                            LogUtils.info("MapScreen: Rendered ${waypoints.size} waypoints")
+                        }
+                    )
+                }
+            }
+        }
+
+        // Load a style so the map isn’t blank
+        mapView.getMapAsync { map ->
+            mapLibreMap = map
+            map.setStyle("https://demotiles.maplibre.org/style.json") {
+                LogUtils.info("MapScreen: MapLibre style loaded")
+            }
+        }
+    }
+
+    override fun onStart() { super.onStart(); mapView.onStart() }
+    override fun onResume() { super.onResume(); mapView.onResume() }
+    override fun onPause() { mapView.onPause(); super.onPause() }
+    override fun onStop() { mapView.onStop(); super.onStop() }
+    override fun onDestroy() { mapView.onDestroy(); super.onDestroy() }
+    override fun onLowMemory() { super.onLowMemory(); mapView.onLowMemory() }
+}

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Map2GPX" xmlns="http://www.topografix.com/GPX/1/1">
+  <wpt lat="11.5564" lon="104.9282">
+    <name>Tent spot</name>
+    <desc>Phnom Penh riverside</desc>
+    <sym>tent</sym>
+  </wpt>
+  <wpt lat="11.5689" lon="104.9210">
+    <name>Fuel stop</name>
+    <desc>Station near Russian Market</desc>
+    <sym>fuel</sym>
+  </wpt>
+  <wpt lat="11.5500" lon="104.9260">
+    <name>Camera point</name>
+    <desc>Independence Monument view</desc>
+    <sym>camera</sym>
+  </wpt>
+</gpx>

@@ -1,0 +1,29 @@
+package com.colin.map2gpx.gpx
+
+import android.content.Context
+import android.content.Intent
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+
+/**
+ * Returns a function you can invoke: shareLauncher("route.gpx", gpxString)
+ *
+ * Baseline approach shares the GPX as text with MIME "application/gpx+xml".
+ * If you prefer file-based sharing later, we can upgrade to a content Uri via FileProvider.
+ */
+@Composable
+fun rememberGpxShareLauncher(
+    context: Context
+): (filename: String, gpxContent: String) -> Unit {
+    return remember {
+        { filename, gpxContent ->
+            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/gpx+xml"
+                putExtra(Intent.EXTRA_SUBJECT, filename)
+                putExtra(Intent.EXTRA_TEXT, gpxContent)
+            }
+            val chooser = Intent.createChooser(sendIntent, "Share GPX")
+            context.startActivity(chooser)
+        }
+    }
+}

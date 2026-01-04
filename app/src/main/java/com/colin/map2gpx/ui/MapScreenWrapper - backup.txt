@@ -1,0 +1,19 @@
+package com.colin.map2gpx.ui
+
+import android.util.Log
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import com.colin.map2gpx.gpx.GpxParser
+
+@Composable
+fun MapScreenWithParser() {
+    val context = LocalContext.current
+    val waypoints = remember {
+        val parsed = GpxParser().parseGpxFile(context, "sample.gpx")
+        Log.d("MapScreenWrapper", "Parsed ${parsed.size} waypoints: $parsed")
+        parsed
+    }
+
+    MapScreen(waypoints = waypoints)
+}

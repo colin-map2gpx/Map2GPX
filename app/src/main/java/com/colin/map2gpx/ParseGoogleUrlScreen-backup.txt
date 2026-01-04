@@ -1,0 +1,241 @@
+package com.colin.map2gpx.ui
+
+import android.net.Uri
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.dp
+
+// ✅ GPX writer + launchers
+import com.colin.map2gpx.gpx.GpxWriter
+import com.colin.map2gpx.gpx.rememberGpxShareLauncher
+import com.colin.map2gpx.gpx.rememberGpxSaveLauncher
+
+// ✅ Model + parser
+import com.colin.map2gpx.model.LatLng
+import com.colin.map2gpx.parser.UrlParser
+
+@Composable
+fun ParseGoogleUrlScreen(
+    modifier: Modifier = Modifier,
+    onParseComplete: (List<LatLng>) -> Unit
+) {
+    var urlText by remember { mutableStateOf("") }
+    var isParsing by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var parsedPoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
+
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+
+    // Simple validation gate: must look like a Google Maps URL
+    val isUrlLikelyGoogleMaps by remember(urlText) {
+        mutableStateOf(
+            urlText.startsWith("https://") &&
+                    (urlText.contains("google.com/maps") || urlText.contains("goo.gl/maps"))
+        )
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        // Header
+        Text(
+            text = "Parse Google Maps URL",
+            style = MaterialTheme.typography.titleLarge
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // URL input
+        TextField(
+            value = urlText,
+            onValueChange = { urlText = it },
+            label = { Text("Paste Google Maps URL") },
+            placeholder = { Text("e.g., https://www.google.com/maps/dir/...") },
+            singleLine = false,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 64.dp)
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = { clipboard.setText(AnnotatedString(urlText)) },
+                enabled = urlText.isNotBlank(),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Copy URL")
+            }
+            OutlinedButton(
+                onClick = {
+                    if (parsedPoints.isNotEmpty()) {
+                        val text = parsedPoints.joinToString(separator = "\n") { p ->
+                            "${p.lat},${p.lng}"
+                        }
+                        clipboard.setText(AnnotatedString(text))
+                    }
+                },
+                enabled = parsedPoints.isNotEmpty(),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Copy LatLngs")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        Divider()
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Parse button with validation + progress
+        Button(
+            onClick = {
+                isParsing = true
+                errorMessage = null
+                parsedPoints = emptyList()
+
+                try {
+                    val points: List<LatLng> = UrlParser.parse(urlText)
+                    if (points.isEmpty()) {
+                        errorMessage = "No route points found in the URL."
+                    } else {
+                        parsedPoints = points
+                        onParseComplete(points)
+                    }
+                } catch (e: Exception) {
+                    errorMessage = "Error parsing URL: ${e.message ?: "Unknown error"}"
+                } finally {
+                    isParsing = false
+                }
+            },
+            enabled = !isParsing && isUrlLikelyGoogleMaps && urlText.isNotBlank(),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (isParsing) "Parsing…" else "Parse")
+        }
+
+        if (!isUrlLikelyGoogleMaps && urlText.isNotBlank()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "This doesn’t look like a Google Maps URL.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Progress indicator
+        if (isParsing) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator()
+                Text(
+                    text = "Parsing route points…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        // Error display
+        errorMessage?.let { msg ->
+            Text(
+                text = msg,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        // Parsed points preview + actions
+        if (parsedPoints.isNotEmpty()) {
+            Text(
+                text = "Parsed LatLng points (${parsedPoints.size}):",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false),
+                contentPadding = PaddingValues(vertical = 4.dp)
+            ) {
+                itemsIndexed(parsedPoints) { index, point ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Point ${index + 1}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "${point.lat}, ${point.lng}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    Divider()
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = { onParseComplete(parsedPoints) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Use these points")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Share GPX
+            val shareLauncher = rememberGpxShareLauncher(context)
+            Button(
+                onClick = {
+                    val gpxString = GpxWriter.generateMultiPointGpx(parsedPoints)
+                    shareLauncher("route.gpx", gpxString)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Share GPX")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Save GPX
+            val saveLauncher = rememberGpxSaveLauncher(context) { uri: Uri ->
+                val gpxString = GpxWriter.generateMultiPointGpx(parsedPoints)
+                GpxWriter.saveToUri(context, uri, gpxString)
+            }
+
+            Button(
+                onClick = {
+                    // Launch the save dialog with a suggested filename
+                    saveLauncher.launch("route.gpx")
+                }
+            ) {
+                Text("Save GPX")
+            }
+        }
+    }
+}

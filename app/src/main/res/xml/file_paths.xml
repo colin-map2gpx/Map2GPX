@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Matches saveGPXToCache() writing to cacheDir/files -->
+    <cache-path name="files" path="files/" />
+</paths>

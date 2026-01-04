@@ -1,0 +1,42 @@
+package com.colin.map2gpx.gpx
+
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+
+/**
+ * SaveLauncher is a tiny wrapper so you can call saveLauncher.launch("route.gpx").
+ */
+class SaveLauncher(private val launchImpl: (String) -> Unit) {
+    fun launch(filename: String) = launchImpl(filename)
+}
+
+/**
+ * Remembers a system save launcher that lets users pick a location and filename.
+ * After selection, it invokes your onUri callback so you can write the GPX content.
+ *
+ * Usage:
+ * val saveLauncher = rememberGpxSaveLauncher(context) { uri ->
+ *   val gpx = GpxWriter.generateMultiPointGpx(points)
+ *   GpxWriter.saveToUri(context, uri, gpx)
+ * }
+ * saveLauncher.launch("route.gpx")
+ */
+@Composable
+fun rememberGpxSaveLauncher(
+    context: Context,
+    onUriSelected: (Uri) -> Unit
+): SaveLauncher {
+    val launcher = rememberLauncherForActivityResult(CreateDocument("application/gpx+xml")) { uri ->
+        if (uri != null) onUriSelected(uri)
+    }
+    return remember {
+        SaveLauncher { filename ->
+            // Suggest a filename; user can edit in the system dialog.
+            launcher.launch(filename)
+        }
+    }
+}

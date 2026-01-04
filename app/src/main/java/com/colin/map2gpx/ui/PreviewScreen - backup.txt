@@ -1,0 +1,89 @@
+package com.colin.map2gpx.ui
+
+import android.annotation.SuppressLint
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.colin.map2gpx.model.LatLng
+import org.maplibre.android.geometry.LatLng as MlLatLng
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.LineString
+import org.maplibre.geojson.Point
+
+@SuppressLint("MissingPermission")
+@Composable
+fun PreviewScreen(
+    route: List<LatLng>,
+    modifier: Modifier = Modifier
+) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var mapView: MapView? by remember { mutableStateOf(null) }
+
+    AndroidView(
+        modifier = modifier.fillMaxSize(),
+        factory = { context ->
+            MapView(context).apply {
+                mapView = this
+                getMapAsync { map ->
+                    map.setStyle(Style.Builder().fromUri("https://demotiles.maplibre.org/style.json")) { style ->
+                        val lineString = LineString.fromLngLats(
+                            route.map { Point.fromLngLat(it.lng, it.lat) }
+                        )
+                        val sourceId = "route-source"
+                        val layerId = "route-layer"
+
+                        val geoJsonSource = GeoJsonSource(sourceId, lineString)
+                        style.addSource(geoJsonSource)
+
+                        val lineLayer = LineLayer(layerId, sourceId).apply {
+                            withProperties(
+                                org.maplibre.android.style.layers.PropertyFactory.lineColor("#ff3b30"),
+                                org.maplibre.android.style.layers.PropertyFactory.lineWidth(5f)
+                            )
+                        }
+                        style.addLayer(lineLayer)
+
+                        route.firstOrNull()?.let {
+                            val target = MlLatLng(it.lat, it.lng)
+                            map.cameraPosition = CameraPosition.Builder()
+                                .target(target)
+                                .zoom(13.0)
+                                .build()
+                        }
+                    }
+                }
+            }
+        }
+    )
+
+    // ✅ Lifecycle handling in proper composable scope
+    DisposableEffect(lifecycleOwner, mapView) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> mapView?.onStart()
+                Lifecycle.Event.ON_RESUME -> mapView?.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView?.onPause()
+                Lifecycle.Event.ON_STOP -> mapView?.onStop()
+                Lifecycle.Event.ON_DESTROY -> mapView?.onDestroy()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            mapView?.onPause()
+            mapView?.onStop()
+            mapView?.onDestroy()
+            mapView = null
+        }
+    }
+}

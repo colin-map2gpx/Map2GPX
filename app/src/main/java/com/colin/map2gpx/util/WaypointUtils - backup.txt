@@ -1,0 +1,52 @@
+
+package com.colin.map2gpx.util
+
+import com.colin.map2gpx.R
+
+fun getWaypointIcon(type: String): Int {
+    return when (type.lowercase()) {
+        "tent" -> R.drawable.tent
+        "motorcycle" -> R.drawable.motorcycle
+        "fuel" -> R.drawable.fuel
+        "camera" -> R.drawable.camera
+        "wrench" -> R.drawable.wrench
+        "food" -> R.drawable.food
+        "hotel" -> R.drawable.hotel
+        else -> R.drawable.ic_launcher_foreground // fallback
+    }
+}
+
+fun resolveIconFor(label: String): String {
+    return when {
+        label.contains("Gas", ignoreCase = true) ||
+                label.contains("Fuel", ignoreCase = true) ||
+                label.contains("Petrol", ignoreCase = true) ||
+                label.contains("gas_station", ignoreCase = true) -> "fuel"
+
+        label.contains("Restaurant", ignoreCase = true) ||
+                label.contains("Food", ignoreCase = true) ||
+                label.contains("Cafe", ignoreCase = true) ||
+                label.contains("Bar", ignoreCase = true) -> "food"
+
+        label.contains("Hotel", ignoreCase = true) ||
+                label.contains("Lodging", ignoreCase = true) ||
+                label.contains("Motel", ignoreCase = true) -> "hotel"
+
+        label.contains("Camp", ignoreCase = true) ||
+                label.contains("Campground", ignoreCase = true) ||
+                label.contains("Campsite", ignoreCase = true) -> "tent"
+
+        label.contains("Repair", ignoreCase = true) ||
+                label.contains("Service", ignoreCase = true) ||
+                label.contains("Mechanic", ignoreCase = true) ||
+                label.contains("car_repair", ignoreCase = true) -> "wrench"
+
+        label.contains("View", ignoreCase = true) ||
+                label.contains("Scenic", ignoreCase = true) ||
+                label.contains("Tourist", ignoreCase = true) ||
+                label.contains("Attraction", ignoreCase = true) ||
+                label.contains("POI", ignoreCase = true) -> "camera"
+
+        else -> "motorcycle"
+    }
+}
