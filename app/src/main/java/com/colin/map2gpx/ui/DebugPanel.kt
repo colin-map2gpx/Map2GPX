@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 import com.colin.map2gpx.gpx.GpxParser
 import com.colin.map2gpx.model.Waypoint
 import com.colin.map2gpx.util.LogUtils
-import com.colin.map2gpx.util.MapRenderer
+import com.colin.map2gpx.map.MapRenderer
 import org.maplibre.android.maps.MapView
 
 @Composable

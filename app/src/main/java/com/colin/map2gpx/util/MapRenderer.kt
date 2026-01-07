@@ -1,103 +1,63 @@
-package com.colin.map2gpx.util
+package com.colin.map2gpx.map
 
 import android.content.Context
-import android.graphics.BitmapFactory
-import android.util.Log
 import com.colin.map2gpx.model.Waypoint
 import org.maplibre.android.maps.MapView
-import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.android.style.layers.SymbolLayer
-import org.maplibre.android.style.layers.PropertyFactory
-import org.maplibre.android.camera.CameraPosition
-import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.style.layers.PropertyFactory.*
+import org.maplibre.android.geometry.LatLng          // ✅ FIXED: import LatLng
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLngBounds
 
 object MapRenderer {
-    private const val LOG_TAG = "MapRenderer"
-    private const val SOURCE_ID = "waypoints-source"
-    private const val LAYER_ID = "waypoints-layer"
-    private const val ICON_PROPERTY = "icon"
 
-    fun renderWaypoints(
-        context: Context,
-        mapView: MapView,
-        waypoints: List<Waypoint>
-    ) {
-        mapView.getMapAsync { map: MapLibreMap ->
-            map.getStyle { style ->
-                ensureIcons(context, style, waypoints)
-                addOrUpdateSource(style, waypoints)
-                addOrUpdateLayer(style)
-                autoZoom(map, waypoints)
-                Log.i(LOG_TAG, "Rendered ${waypoints.size} waypoints via SymbolLayer")
-            }
-        }
-    }
+    fun renderWaypoints(context: Context, mapView: MapView, waypoints: List<Waypoint>) {
+        mapView.getMapAsync { mapLibreMap ->
+            // Load OSM Bright style from assets
+            mapLibreMap.setStyle(
+                Style.Builder().fromUri("asset://osm_bright.json")
+            ) { style ->
 
-    private fun ensureIcons(context: Context, style: Style, waypoints: List<Waypoint>) {
-        val uniqueIcons = waypoints.mapNotNull { it.icon }.toSet()
-        uniqueIcons.forEach { iconName ->
-            val resId = context.resources.getIdentifier(iconName, "drawable", context.packageName)
-            if (resId != 0) {
-                val bmp = BitmapFactory.decodeResource(context.resources, resId)
-                if (style.getImage(iconName) == null) {
-                    style.addImage(iconName, bmp)
-                    Log.d(LOG_TAG, "Added style image: $iconName")
+                // Convert waypoints to GeoJSON features
+                val features = waypoints.map { waypoint ->
+                    Feature.fromGeometry(
+                        Point.fromLngLat(waypoint.lon, waypoint.lat)
+                    ).apply {
+                        addStringProperty("icon", waypoint.icon)
+                    }
                 }
-            } else {
-                Log.w(LOG_TAG, "Drawable not found for icon name: $iconName")
+
+                // Add source
+                val source = GeoJsonSource("waypoints-source", FeatureCollection.fromFeatures(features))
+                style.addSource(source)
+
+                // Add layer for icons
+                val layer = SymbolLayer("waypoints-layer", "waypoints-source").withProperties(
+                    iconImage("{icon}"),
+                    iconAllowOverlap(true),
+                    iconIgnorePlacement(true),
+                    iconSize(0.5f)
+                )
+                style.addLayer(layer)
+
+                // Auto-zoom to fit all waypoints
+                if (waypoints.isNotEmpty()) {
+                    val boundsBuilder = LatLngBounds.Builder()
+                    waypoints.forEach { waypoint ->
+                        boundsBuilder.include(LatLng(waypoint.lat, waypoint.lon))   // ✅ use include()
+                    }
+                    val bounds = boundsBuilder.build()
+                    mapLibreMap.animateCamera(
+                        CameraUpdateFactory.newLatLngBounds(bounds, 50)
+                    )
+                }
+
             }
         }
-    }
-
-    private fun addOrUpdateSource(style: Style, waypoints: List<Waypoint>) {
-        val features = waypoints.map { w ->
-            Feature.fromGeometry(Point.fromLngLat(w.lon, w.lat)).apply {
-                w.icon?.let { addStringProperty(ICON_PROPERTY, it) }
-            }
-        }
-        val collection = FeatureCollection.fromFeatures(features)
-
-        val existing = style.getSource(SOURCE_ID) as? GeoJsonSource
-        if (existing == null) {
-            val source = GeoJsonSource(SOURCE_ID, collection)
-            style.addSource(source)
-            Log.d(LOG_TAG, "Added GeoJsonSource: $SOURCE_ID")
-        } else {
-            existing.setGeoJson(collection)
-            Log.d(LOG_TAG, "Updated GeoJsonSource: $SOURCE_ID (${waypoints.size} features)")
-        }
-    }
-
-    private fun addOrUpdateLayer(style: Style) {
-        val existing = style.getLayer(LAYER_ID) as? SymbolLayer
-        if (existing == null) {
-            val layer = SymbolLayer(LAYER_ID, SOURCE_ID).withProperties(
-                PropertyFactory.iconImage("{${ICON_PROPERTY}}"),
-                PropertyFactory.iconAllowOverlap(true),
-                PropertyFactory.iconIgnorePlacement(true)
-            )
-            style.addLayer(layer)
-            Log.d(LOG_TAG, "Added SymbolLayer: $LAYER_ID")
-        } else {
-            existing.setProperties(
-                PropertyFactory.iconImage("{${ICON_PROPERTY}}"),
-                PropertyFactory.iconAllowOverlap(true),
-                PropertyFactory.iconIgnorePlacement(true)
-            )
-        }
-    }
-
-    private fun autoZoom(map: MapLibreMap, waypoints: List<Waypoint>) {
-        val first = waypoints.firstOrNull() ?: return
-        val cameraPosition = CameraPosition.Builder()
-            .target(LatLng(first.lat, first.lon))
-            .zoom(14.0)
-            .build()
-        map.cameraPosition = cameraPosition
     }
 }

@@ -7,6 +7,8 @@ import java.util.Locale
 import android.content.Context
 import android.net.Uri
 import java.io.OutputStream
+import java.io.File
+import androidx.core.content.FileProvider
 
 /**
  * GpxWriter
@@ -66,6 +68,31 @@ object GpxWriter {
     fun saveToUri(context: Context, uri: Uri, gpxString: String) {
         context.contentResolver.openOutputStream(uri)?.use { outputStream: OutputStream ->
             outputStream.write(gpxString.toByteArray())
+        }
+    }
+
+    /**
+     * Save GPX to app cache and return a sharable Uri via FileProvider.
+     *
+     * @param context Android context
+     * @param points List of LatLng points
+     * @return Uri for the saved GPX file, or null if failed
+     */
+    fun saveToCacheAndGetUri(context: Context, points: List<LatLng>): Uri? {
+        val gpxString = generateMultiPointGpx(points)
+        val fileName = "map2gpx_export_${System.currentTimeMillis()}.gpx"
+        val file = File(context.cacheDir, fileName)
+
+        return try {
+            file.writeText(gpxString)
+            FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider", // ensure FileProvider is declared in manifest
+                file
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 }
