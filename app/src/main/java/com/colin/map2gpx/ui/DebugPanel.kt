@@ -42,17 +42,19 @@ fun DebugPanel(
             }
 
             LogUtils.info("Debug: Parsing GPX (${text.length} chars)")
-            val waypoints: List<Waypoint> = runCatching { GpxParser.parse(text) }
+            val (waypoints, trackPoints) = runCatching { GpxParser.parse(text) }
                 .onFailure { LogUtils.error("GPX parse failed", it) }
-                .getOrNull().orEmpty()
+                .getOrNull() ?: Pair(emptyList(), emptyList())
 
-            LogUtils.info("Debug: Parsed ${waypoints.size} waypoints")
+            LogUtils.info("Debug: Parsed ${waypoints.size} waypoints, ${trackPoints.size} track points")
 
             onWaypointsLoaded(waypoints)
 
             mapView?.let { mv ->
+                // ✅ Render both waypoints and track, with unified auto-zoom
                 MapRenderer.renderWaypoints(context, mv, waypoints)
-                LogUtils.info("Debug: Rendered ${waypoints.size} waypoints on map")
+                MapRenderer.renderTrack(context, mv, waypoints, trackPoints)
+                LogUtils.info("Debug: Rendered ${waypoints.size} waypoints and ${trackPoints.size} track points on map")
             } ?: LogUtils.info("MapView not ready; skipped rendering.")
         }) {
             Text("Load & Render GPX waypoints")

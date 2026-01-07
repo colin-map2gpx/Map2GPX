@@ -3,15 +3,26 @@ package com.colin.map2gpx.ui
 import androidx.lifecycle.ViewModel
 import com.colin.map2gpx.model.Waypoint   // ✅ Correct import
 import com.colin.map2gpx.gpx.GpxParser
+import org.maplibre.android.geometry.LatLng
 
 /**
- * ViewModel holds parsed waypoints. On init, parses a built-in sample GPX string
- * so you can confirm the full pipeline without touching MainActivity.
+ * ViewModel holds parsed waypoints and track points.
+ * On init, parses a built-in sample GPX string so you can confirm
+ * the full pipeline without touching MainActivity.
  */
 class MapViewModel : ViewModel() {
 
     private val parser = GpxParser
-    val waypoints: List<Waypoint> = parser.parse(SAMPLE_GPX)
+
+    // ✅ Destructure the Pair into waypoints and trackPoints
+    val waypoints: List<Waypoint>
+    val trackPoints: List<LatLng>
+
+    init {
+        val (wps, trkpts) = parser.parse(SAMPLE_GPX)
+        waypoints = wps
+        trackPoints = trkpts
+    }
 
     companion object {
         // Minimal embedded GPX with a couple of waypoints
