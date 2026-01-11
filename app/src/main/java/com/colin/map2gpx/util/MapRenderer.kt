@@ -35,7 +35,9 @@ object MapRenderer {
                     val resId = context.resources.getIdentifier(id, "drawable", context.packageName)
                     if (resId != 0) {
                         val bitmap = BitmapFactory.decodeResource(context.resources, resId)
-                        style.addImageAsync(id, bitmap)   // ✅ register icon
+                        if (style.getImage(id) == null) {
+                            style.addImageAsync(id, bitmap)   // ✅ register icon once
+                        }
                     }
                 }
 
@@ -48,20 +50,28 @@ object MapRenderer {
                     }
                 }
 
-                // Add source
-                val source = GeoJsonSource("waypoints-source", FeatureCollection.fromFeatures(features))
-                style.addSource(source)
+                // Add or update source
+                val sourceId = "waypoints-source"
+                val existingSource = style.getSource(sourceId) as? GeoJsonSource
+                if (existingSource != null) {
+                    existingSource.setGeoJson(FeatureCollection.fromFeatures(features))
+                } else {
+                    style.addSource(GeoJsonSource(sourceId, FeatureCollection.fromFeatures(features)))
+                }
 
                 // Add layer for icons (✅ use Expression.get)
-                val layer = SymbolLayer("waypoints-layer", "waypoints-source").withProperties(
-                    iconImage(Expression.get("icon")),
-                    iconAllowOverlap(true),
-                    iconIgnorePlacement(true),
-                    iconSize(0.7f),
-                    iconHaloColor(Color.WHITE),   // ✅ outline around icon
-                    iconHaloWidth(2.0f)           // ✅ thickness of outline
-                )
-                style.addLayer(layer)
+                val layerId = "waypoints-layer"
+                if (style.getLayer(layerId) == null) {
+                    val layer = SymbolLayer(layerId, sourceId).withProperties(
+                        iconImage(Expression.get("icon")),
+                        iconAllowOverlap(true),
+                        iconIgnorePlacement(true),
+                        iconSize(0.7f),
+                        iconHaloColor(Color.WHITE),   // ✅ outline around icon
+                        iconHaloWidth(2.0f)           // ✅ thickness of outline
+                    )
+                    style.addLayer(layer)
+                }
             }
         }
     }
@@ -76,14 +86,24 @@ object MapRenderer {
                     )
                     val lineFeature = Feature.fromGeometry(lineString)
 
-                    val lineSource = GeoJsonSource("track-source", FeatureCollection.fromFeature(lineFeature))
-                    style.addSource(lineSource)
+                    val sourceId = "track-source"
+                    val existingSource = style.getSource(sourceId) as? GeoJsonSource
+                    if (existingSource != null) {
+                        existingSource.setGeoJson(FeatureCollection.fromFeature(lineFeature))
+                    } else {
+                        style.addSource(GeoJsonSource(sourceId, FeatureCollection.fromFeature(lineFeature)))
+                    }
 
-                    val lineLayer = LineLayer("track-layer", "track-source").withProperties(
-                        lineColor(Color.BLUE),
-                        lineWidth(3.0f)
-                    )
-                    style.addLayer(lineLayer)
+                    val layerId = "track-layer"
+                    if (style.getLayer(layerId) == null) {
+                        val lineLayer = LineLayer(layerId, sourceId).withProperties(
+                            lineColor(Color.BLUE),
+                            lineWidth(3.0f),
+                            lineJoin("round"),
+                            lineCap("round")
+                        )
+                        style.addLayer(lineLayer)
+                    }
                 }
 
                 // ✅ Unified auto-zoom: fit both waypoints and track points
@@ -99,6 +119,38 @@ object MapRenderer {
                     mapLibreMap.animateCamera(
                         CameraUpdateFactory.newLatLngBounds(bounds, 50)
                     )
+                }
+            }
+        }
+    }
+
+    fun renderRouteLine(context: Context, mapView: MapView, waypoints: List<Waypoint>) {
+        mapView.getMapAsync { mapLibreMap ->
+            mapLibreMap.getStyle { style ->
+                if (waypoints.size > 1) {
+                    val lineString = LineString.fromLngLats(
+                        waypoints.map { Point.fromLngLat(it.lon, it.lat) }
+                    )
+                    val lineFeature = Feature.fromGeometry(lineString)
+
+                    val sourceId = "route-source"
+                    val existingSource = style.getSource(sourceId) as? GeoJsonSource
+                    if (existingSource != null) {
+                        existingSource.setGeoJson(FeatureCollection.fromFeature(lineFeature))
+                    } else {
+                        style.addSource(GeoJsonSource(sourceId, FeatureCollection.fromFeature(lineFeature)))
+                    }
+
+                    val layerId = "route-layer"
+                    if (style.getLayer(layerId) == null) {
+                        val lineLayer = LineLayer(layerId, sourceId).withProperties(
+                            lineColor(Color.RED),
+                            lineWidth(4.0f),
+                            lineJoin("round"),
+                            lineCap("round")
+                        )
+                        style.addLayer(lineLayer)
+                    }
                 }
             }
         }

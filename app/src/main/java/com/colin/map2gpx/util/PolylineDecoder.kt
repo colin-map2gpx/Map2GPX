@@ -1,3 +1,4 @@
+// app/src/main/java/com/colin/map2gpx/util/PolylineDecoder.kt
 package com.colin.map2gpx.util
 
 import com.colin.map2gpx.model.LatLng
@@ -18,25 +19,30 @@ object PolylineDecoder {
      * @return Ordered list of LatLng points along the route.
      */
     fun decode(encoded: String): List<LatLng> {
-        val points = mutableListOf<LatLng>()
+        if (encoded.isEmpty()) return emptyList()
+
+        val points = ArrayList<LatLng>()
         var index = 0
         var latE5 = 0
         var lngE5 = 0
 
-        // Keep looping until we've consumed the entire encoded string
         while (index < encoded.length) {
             // Decode latitude delta
             val latResult = decodeNextComponent(encoded, index)
+            if (latResult == null) break
             latE5 += latResult.value
             index = latResult.nextIndex
 
             // Decode longitude delta
             val lngResult = decodeNextComponent(encoded, index)
+            if (lngResult == null) break
             lngE5 += lngResult.value
             index = lngResult.nextIndex
 
             // Convert to LatLng (divide by 1e5 to get decimal degrees)
-            points.add(LatLng(latE5 / 1e5, lngE5 / 1e5))
+            val lat = latE5 / 1e5.toDouble()
+            val lng = lngE5 / 1e5.toDouble()
+            points.add(LatLng(lat, lng))
         }
 
         return points
@@ -45,8 +51,10 @@ object PolylineDecoder {
     /**
      * Helper to decode one value (latitude or longitude delta) from the polyline stream.
      * Consumes characters until a byte with continuation bit cleared is found.
+     *
+     * @return ComponentResult or null if input is malformed/insufficient.
      */
-    private fun decodeNextComponent(encoded: String, startIndex: Int): ComponentResult {
+    private fun decodeNextComponent(encoded: String, startIndex: Int): ComponentResult? {
         var result = 0
         var shift = 0
         var index = startIndex
@@ -61,6 +69,9 @@ object PolylineDecoder {
 
             if (b < 0x20) break  // Stop when continuation bit is cleared
         }
+
+        // If we exited because we ran out of input without clearing continuation bit
+        if (shift == 0) return null
 
         // Zigzag decode: convert to signed int
         val delta = if ((result and 1) != 0) {

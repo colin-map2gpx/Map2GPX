@@ -2,13 +2,16 @@
 package com.colin.map2gpx.model
 
 /**
- * Shared waypoint model used across parser, renderer, and share/export.
- * Pure Kotlin data class with no Android dependencies.
+ * Represents a single waypoint in a route.
+ * - id: unique identifier (string index or GPX ID)
+ * - name: human-readable label (parsed from Google Maps or GPX, "" if missing)
+ * - lat/lon: coordinates (always non-null once parsed from GPX)
+ * - icon: resolved icon type (fuel, tent, etc.), always non-null
  */
 data class Waypoint(
-    val id: String,             // stable key (e.g., name+lat+lon)
-    val lat: Double,
-    val lon: Double,
-    val name: String? = null,
-    val icon: String            // resolved icon key (fuel, tent, etc.)
+    val id: String,    // unique identifier
+    val name: String,  // display name ("" if missing)
+    val lat: Double,   // latitude
+    val lon: Double,   // longitude
+    val icon: String   // resolved icon key
 )

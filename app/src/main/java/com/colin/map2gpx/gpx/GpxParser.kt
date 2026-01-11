@@ -8,8 +8,6 @@ import com.colin.map2gpx.util.IconResolver
 import com.colin.map2gpx.util.Checkpoint
 import org.maplibre.android.geometry.LatLng
 import org.xmlpull.v1.XmlPullParser
-import org.xmlpull.v1.XmlPullParserException
-import java.io.IOException
 import java.io.InputStream
 
 /**
@@ -25,9 +23,12 @@ object GpxParser {
             Checkpoint.start("GpxParser", "parse(InputStream)")
             val gpxData = input.bufferedReader().use { it.readText() }
             val result = parse(gpxData)
-            Checkpoint.done("GpxParser", "parse(InputStream success: ${result.first.size} waypoints, ${result.second.size} track points)")
+            Checkpoint.done(
+                "GpxParser",
+                "parse(InputStream success: ${result.first.size} waypoints, ${result.second.size} track points)"
+            )
             result
-        } catch (e: IOException) {
+        } catch (e: Exception) {
             Checkpoint.done("GpxParser", "parse(InputStream failed: ${e.message})")
             Pair(emptyList(), emptyList())
         }
@@ -73,6 +74,8 @@ object GpxParser {
                                 val tLon = parser.getAttributeValue(null, "lon")?.toDoubleOrNull()
                                 if (tLat != null && tLon != null) {
                                     trackPoints.add(LatLng(tLat, tLon))
+                                    // Optional debug log for each track point
+                                    // Checkpoint.log("GpxParser", "Added track point $tLat,$tLon")
                                 }
                             }
                         }
@@ -95,14 +98,15 @@ object GpxParser {
                             if (finalLat != null && finalLon != null) {
                                 val rawIconType = type ?: sym
                                 val iconKey = IconResolver.resolveIconFor(rawIconType)
-                                val idKey = "${name ?: "wp"}-${finalLat}-${finalLon}"
+                                val safeName = name ?: "" // ensure non-null
+                                val idKey = "${safeName.ifEmpty { "wp" }}-${"%.6f".format(finalLat)}-${"%.6f".format(finalLon)}"
 
                                 waypoints.add(
                                     Waypoint(
                                         id = idKey,
                                         lat = finalLat,
                                         lon = finalLon,
-                                        name = name,
+                                        name = safeName,
                                         icon = iconKey
                                     )
                                 )
@@ -120,12 +124,15 @@ object GpxParser {
                 }
                 event = parser.next()
             }
-        } catch (e: XmlPullParserException) {
+        } catch (e: Exception) {
             Checkpoint.done("GpxParser", "parse(String failed: ${e.message})")
             return Pair(emptyList(), emptyList())
         }
 
-        Checkpoint.done("GpxParser", "parse(String success: ${waypoints.size} waypoints, ${trackPoints.size} track points)")
+        Checkpoint.done(
+            "GpxParser",
+            "parse(String success: ${waypoints.size} waypoints, ${trackPoints.size} track points)"
+        )
         return Pair(waypoints, trackPoints)
     }
 
@@ -134,9 +141,12 @@ object GpxParser {
             Checkpoint.start("GpxParser", "parseGpxFile $assetFileName")
             val gpxData = context.assets.open(assetFileName).bufferedReader().use { it.readText() }
             val result = parse(gpxData)
-            Checkpoint.done("GpxParser", "parseGpxFile success (${result.first.size} waypoints, ${result.second.size} track points)")
+            Checkpoint.done(
+                "GpxParser",
+                "parseGpxFile success (${result.first.size} waypoints, ${result.second.size} track points)"
+            )
             result
-        } catch (e: IOException) {
+        } catch (e: Exception) {
             Checkpoint.done("GpxParser", "parseGpxFile failed: ${e.message}")
             Pair(emptyList(), emptyList())
         }

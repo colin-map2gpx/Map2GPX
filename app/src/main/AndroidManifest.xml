@@ -19,14 +19,36 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Map2Gpx">
 
-        <!-- Launcher activity is MainActivity -->
+        <!-- Launcher + Share activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.Map2Gpx">
+
+            <!-- Launcher intent -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Share intent: receive Google Maps route text -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="text/uri-list" />
+            </intent-filter>
+
+            <!-- View intent: handle direct Google Maps links -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <!-- Short Google Maps links -->
+                <data android:scheme="https" android:host="maps.app.goo.gl" />
+                <!-- Full Google Maps links -->
+                <data android:scheme="https" android:host="www.google.com" android:pathPrefix="/maps" />
             </intent-filter>
         </activity>
 

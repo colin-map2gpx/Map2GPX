@@ -1,3 +1,4 @@
+// app/src/main/java/com/colin/map2gpx/ui/DebugPanel.kt
 package com.colin.map2gpx.ui
 
 import android.content.Context
@@ -31,33 +32,40 @@ fun DebugPanel(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Button(onClick = {
-            LogUtils.info("Debug: Reading GPX asset: $assetPath")
+            LogUtils.info("DebugPanel: Reading GPX asset: $assetPath")
+
             val text = runCatching { readAssetText(context, assetPath) }
-                .onFailure { LogUtils.error("Failed to read asset: $assetPath", it) }
+                .onFailure { LogUtils.error("DebugPanel: Failed to read asset: $assetPath", it) }
                 .getOrNull()
 
             if (text.isNullOrEmpty()) {
-                LogUtils.error("Asset is empty or missing: $assetPath")
+                LogUtils.error("DebugPanel: Asset is empty or missing: $assetPath")
                 return@Button
             }
 
-            LogUtils.info("Debug: Parsing GPX (${text.length} chars)")
+            LogUtils.info("DebugPanel: Parsing GPX (${text.length} chars)")
             val (waypoints, trackPoints) = runCatching { GpxParser.parse(text) }
-                .onFailure { LogUtils.error("GPX parse failed", it) }
+                .onFailure { LogUtils.error("DebugPanel: GPX parse failed", it) }
                 .getOrNull() ?: Pair(emptyList(), emptyList())
 
-            LogUtils.info("Debug: Parsed ${waypoints.size} waypoints, ${trackPoints.size} track points")
+            LogUtils.info("DebugPanel: Parsed ${waypoints.size} waypoints, ${trackPoints.size} track points")
 
+            // Notify upstream (e.g., for list UI or state)
             onWaypointsLoaded(waypoints)
 
-            mapView?.let { mv ->
-                // ✅ Render both waypoints and track, with unified auto-zoom
-                MapRenderer.renderWaypoints(context, mv, waypoints)
-                MapRenderer.renderTrack(context, mv, waypoints, trackPoints)
-                LogUtils.info("Debug: Rendered ${waypoints.size} waypoints and ${trackPoints.size} track points on map")
-            } ?: LogUtils.info("MapView not ready; skipped rendering.")
+            val mv = mapView
+            if (mv == null) {
+                LogUtils.info("DebugPanel: MapView not ready; skipped rendering.")
+                return@Button
+            }
+
+            // Render both: style is set in renderWaypoints, then reused in renderTrack
+            MapRenderer.renderWaypoints(context, mv, waypoints)
+            MapRenderer.renderTrack(context, mv, waypoints, trackPoints)
+
+            LogUtils.info("DebugPanel: Rendered ${waypoints.size} waypoints and ${trackPoints.size} track points on map")
         }) {
-            Text("Load & Render GPX waypoints")
+            Text("Load & Render GPX")
         }
     }
 }
