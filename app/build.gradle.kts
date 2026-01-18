@@ -46,11 +46,12 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.8.0")
 
     // MapLibre SDK
-    implementation("org.maplibre.gl:android-sdk:12.3.1")
+    implementation("org.maplibre.gl:android-sdk:12.3.0")   // ✅ correct version
 
     // AndroidX core + lifecycle
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.4")   // ✅ add this
 
     // AppCompat (needed for AppCompatActivity)
     implementation("androidx.appcompat:appcompat:1.6.1")

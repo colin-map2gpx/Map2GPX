@@ -1,4 +1,3 @@
-// app/src/main/java/com/colin/map2gpx/gpx/GpxParser.kt
 package com.colin.map2gpx.gpx
 
 import android.content.Context
@@ -9,20 +8,22 @@ import com.colin.map2gpx.util.Checkpoint
 import org.maplibre.android.geometry.LatLng
 import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
+import java.io.InputStreamReader
 
 /**
  * GPX parser: extracts <wpt> latitude/longitude and optional <name>/<type>/<sym>,
- * plus <trkpt> track points for route line rendering.
- * Safe and explicit for Colin's workflow.
+ * plus <trkpt> (and <rtept>) points for route line rendering.
+ * Streaming, safe, and explicit for Colin's workflow.
  */
 object GpxParser {
 
-    // Overload: parse from InputStream (e.g., SAF or file picker)
+    /**
+     * Parse from InputStream (preferred: streaming, no full-file read).
+     */
     fun parse(input: InputStream): Pair<List<Waypoint>, List<LatLng>> {
         return try {
             Checkpoint.start("GpxParser", "parse(InputStream)")
-            val gpxData = input.bufferedReader().use { it.readText() }
-            val result = parse(gpxData)
+            val result = parseInternal(InputStreamReader(input))
             Checkpoint.done(
                 "GpxParser",
                 "parse(InputStream success: ${result.first.size} waypoints, ${result.second.size} track points)"
@@ -34,26 +35,64 @@ object GpxParser {
         }
     }
 
-    // Parse from String content
+    /**
+     * Parse from String content (kept for compatibility).
+     */
     fun parse(gpx: String): Pair<List<Waypoint>, List<LatLng>> {
-        Checkpoint.start("GpxParser", "parse(String)")
+        return try {
+            Checkpoint.start("GpxParser", "parse(String)")
+            val result = parseInternal(gpx.reader())
+            Checkpoint.done(
+                "GpxParser",
+                "parse(String success: ${result.first.size} waypoints, ${result.second.size} track points)"
+            )
+            result
+        } catch (e: Exception) {
+            Checkpoint.done("GpxParser", "parse(String failed: ${e.message})")
+            Pair(emptyList(), emptyList())
+        }
+    }
+
+    /**
+     * Parse GPX from assets by filename (streaming).
+     */
+    fun parseGpxFile(context: Context, assetFileName: String): Pair<List<Waypoint>, List<LatLng>> {
+        return try {
+            Checkpoint.start("GpxParser", "parseGpxFile $assetFileName")
+            context.assets.open(assetFileName).use { input ->
+                val result = parseInternal(InputStreamReader(input))
+                Checkpoint.done(
+                    "GpxParser",
+                    "parseGpxFile success (${result.first.size} waypoints, ${result.second.size} track points)"
+                )
+                result
+            }
+        } catch (e: Exception) {
+            Checkpoint.done("GpxParser", "parseGpxFile failed: ${e.message}")
+            Pair(emptyList(), emptyList())
+        }
+    }
+
+    // ---- Internal streaming parser ----
+
+    private fun parseInternal(reader: java.io.Reader): Pair<List<Waypoint>, List<LatLng>> {
         val waypoints = mutableListOf<Waypoint>()
         val trackPoints = mutableListOf<LatLng>()
 
         val parser = Xml.newPullParser()
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
-        parser.setInput(gpx.reader())
+        parser.setInput(reader)
 
         var event = parser.eventType
         var currentTag: String? = null
 
-        // Temp holders for a waypoint
-        var lat: Double? = null
-        var lon: Double? = null
-        var name: String? = null
-        var type: String? = null
-        var sym: String? = null
+        // Waypoint temp state
         var insideWpt = false
+        var wptLat: Double? = null
+        var wptLon: Double? = null
+        var wptName: String? = null
+        var wptType: String? = null
+        var wptSym: String? = null
 
         try {
             while (event != XmlPullParser.END_DOCUMENT) {
@@ -61,44 +100,59 @@ object GpxParser {
                     XmlPullParser.START_TAG -> {
                         currentTag = parser.name
                         when (currentTag) {
+                            // Waypoint start
                             "wpt" -> {
                                 insideWpt = true
-                                lat = parser.getAttributeValue(null, "lat")?.toDoubleOrNull()
-                                lon = parser.getAttributeValue(null, "lon")?.toDoubleOrNull()
-                                name = null
-                                type = null
-                                sym = null
+                                wptLat = parser.getAttributeValue(null, "lat")?.toDoubleOrNull()
+                                wptLon = parser.getAttributeValue(null, "lon")?.toDoubleOrNull()
+                                wptName = null
+                                wptType = null
+                                wptSym = null
                             }
+
+                            // Track point
                             "trkpt" -> {
                                 val tLat = parser.getAttributeValue(null, "lat")?.toDoubleOrNull()
                                 val tLon = parser.getAttributeValue(null, "lon")?.toDoubleOrNull()
                                 if (tLat != null && tLon != null) {
                                     trackPoints.add(LatLng(tLat, tLon))
-                                    // Optional debug log for each track point
-                                    // Checkpoint.log("GpxParser", "Added track point $tLat,$tLon")
                                 }
                             }
+
+                            // Route point (optional support)
+                            "rtept" -> {
+                                val rLat = parser.getAttributeValue(null, "lat")?.toDoubleOrNull()
+                                val rLon = parser.getAttributeValue(null, "lon")?.toDoubleOrNull()
+                                if (rLat != null && rLon != null) {
+                                    trackPoints.add(LatLng(rLat, rLon))
+                                }
+                            }
+
+                            // Name/type/sym handled in TEXT
+                            "name", "type", "sym" -> { /* handled in TEXT */ }
                         }
                     }
+
                     XmlPullParser.TEXT -> {
                         val text = parser.text?.trim()
-                        if (insideWpt && !text.isNullOrEmpty()) {
+                        if (!text.isNullOrEmpty()) {
                             when (currentTag) {
-                                "name" -> name = text
-                                "type" -> type = text
-                                "sym"  -> sym = text
+                                "name" -> if (insideWpt) wptName = text
+                                "type" -> if (insideWpt) wptType = text
+                                "sym"  -> if (insideWpt) wptSym = text
                             }
                         }
                     }
+
                     XmlPullParser.END_TAG -> {
                         val tagName = parser.name
                         if (tagName == "wpt") {
-                            val finalLat = lat
-                            val finalLon = lon
+                            val finalLat = wptLat
+                            val finalLon = wptLon
                             if (finalLat != null && finalLon != null) {
-                                val rawIconType = type ?: sym
+                                val rawIconType = wptType ?: wptSym
                                 val iconKey = IconResolver.resolveIconFor(rawIconType)
-                                val safeName = name ?: "" // ensure non-null
+                                val safeName = wptName ?: ""
                                 val idKey = "${safeName.ifEmpty { "wp" }}-${"%.6f".format(finalLat)}-${"%.6f".format(finalLon)}"
 
                                 waypoints.add(
@@ -111,13 +165,13 @@ object GpxParser {
                                     )
                                 )
                             }
-                            // reset
+                            // Reset waypoint state
                             insideWpt = false
-                            lat = null
-                            lon = null
-                            name = null
-                            type = null
-                            sym = null
+                            wptLat = null
+                            wptLon = null
+                            wptName = null
+                            wptType = null
+                            wptSym = null
                         }
                         currentTag = null
                     }
@@ -125,30 +179,10 @@ object GpxParser {
                 event = parser.next()
             }
         } catch (e: Exception) {
-            Checkpoint.done("GpxParser", "parse(String failed: ${e.message})")
-            return Pair(emptyList(), emptyList())
+            // Bubble up to caller for checkpoint logging
+            throw e
         }
 
-        Checkpoint.done(
-            "GpxParser",
-            "parse(String success: ${waypoints.size} waypoints, ${trackPoints.size} track points)"
-        )
         return Pair(waypoints, trackPoints)
-    }
-
-    fun parseGpxFile(context: Context, assetFileName: String): Pair<List<Waypoint>, List<LatLng>> {
-        return try {
-            Checkpoint.start("GpxParser", "parseGpxFile $assetFileName")
-            val gpxData = context.assets.open(assetFileName).bufferedReader().use { it.readText() }
-            val result = parse(gpxData)
-            Checkpoint.done(
-                "GpxParser",
-                "parseGpxFile success (${result.first.size} waypoints, ${result.second.size} track points)"
-            )
-            result
-        } catch (e: Exception) {
-            Checkpoint.done("GpxParser", "parseGpxFile failed: ${e.message}")
-            Pair(emptyList(), emptyList())
-        }
     }
 }

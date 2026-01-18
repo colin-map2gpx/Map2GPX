@@ -1,12 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.colin.map2gpx">
 
+    <!-- Network and Bluetooth (as currently declared) -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+
+    <!-- Legacy external storage write (scoped by maxSdkVersion 28) -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
     <application
@@ -32,7 +37,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Share intent: receive Google Maps route text -->
+            <!-- Share intent: receive Google Maps route text/links -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -52,7 +57,7 @@
             </intent-filter>
         </activity>
 
-        <!-- FileProvider setup for sharing GPX files -->
+        <!-- FileProvider setup for sharing GPX files from cacheDir -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
