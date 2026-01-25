@@ -1,43 +1,51 @@
 package com.colin.map2gpx.ui
 
 import android.content.Context
-import androidx.compose.foundation.layout.Column
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
-import com.colin.map2gpx.model.Waypoint
 import com.colin.map2gpx.map.MapRenderer
+import com.colin.map2gpx.model.Waypoint
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.geojson.Point
 
 @Composable
 fun RouteScreen(
     context: Context,
-    mapView: MapView,
     waypoints: List<Waypoint>,
-    onDataLoaded: (List<Waypoint>, List<LatLng>) -> Unit = { _, _ -> }
+    trackPoints: List<LatLng>,
+    modifier: Modifier = Modifier,
+    onDataLoaded: (List<Waypoint>, List<LatLng>) -> Unit
 ) {
-    // Keep track of current waypoints in Compose state
-    var waypointsState by remember { mutableStateOf(waypoints) }
+    var mapView: MapView? = null
 
-    Column {
-        // Host the MapView inside Compose
-        AndroidView(factory = { _: Context ->
-            mapView
-        })
+    Box(modifier = modifier.fillMaxSize()) {
+        AndroidView(
+            factory = { ctx ->
+                MapView(ctx).also { createdView ->
+                    mapView = createdView
+                    MapRenderer.initMap(context, createdView)
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
 
-        // Overlay DebugPanel with buttons wired to callbacks
+        mapView?.let { safeMapView ->
+            val trackPointsAsPoints = trackPoints.map { latLng ->
+                Point.fromLngLat(latLng.longitude, latLng.latitude)
+            }
+            MapRenderer.renderAll(context, safeMapView, waypoints, trackPointsAsPoints)
+        }
+
+        // ✅ Pass all required parameters to DebugPanel
         DebugPanel(
             context = context,
             mapView = mapView,
-            currentWaypoints = waypointsState,
-            onDataLoaded = { newWaypoints, trackPoints ->
-                // Update state or propagate upstream
-                waypointsState = newWaypoints
-                onDataLoaded(newWaypoints, trackPoints)
-                // Render both waypoints and track line
-                MapRenderer.renderAll(context, mapView, newWaypoints, trackPoints)
-            }
+            currentWaypoints = waypoints,
+            onDataLoaded = onDataLoaded
         )
     }
 }

@@ -1,7 +1,6 @@
 package com.colin.map2gpx
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.mutableStateOf
@@ -13,7 +12,6 @@ import com.colin.map2gpx.ui.RouteScreen
 import com.colin.map2gpx.ui.theme.Map2GpxTheme
 import org.maplibre.android.MapLibre
 import org.maplibre.android.WellKnownTileServer
-import org.maplibre.android.maps.MapView
 import org.maplibre.android.geometry.LatLng
 
 class MainActivity : ComponentActivity() {
@@ -31,21 +29,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             Map2GpxTheme {
                 var waypoints by remember { mutableStateOf(emptyList<Waypoint>()) }
+                var trackPoints by remember { mutableStateOf(emptyList<LatLng>()) }
 
-                // Create a MapView instance
-                val mapView = MapView(this)
-
-                // Render RouteScreen (aligned with new DebugPanel signature)
+                // Render RouteScreen with current state
                 RouteScreen(
                     context = this,
-                    mapView = mapView,
                     waypoints = waypoints,
-                    onDataLoaded = { newWaypoints, trackPoints ->
+                    trackPoints = trackPoints,
+                    onDataLoaded = { newWaypoints, newTrackPoints ->
                         waypoints = newWaypoints
-                        Log.d(
-                            "MainActivity",
-                            "Waypoints updated: ${waypoints.size}, Track points: ${trackPoints.size}"
-                        )
+                        trackPoints = newTrackPoints
                     }
                 )
             }

@@ -1,59 +1,45 @@
-package com.colin.map2gpx.ui.route
+package com.colin.map2gpx.route
 
-import android.os.Bundle
+import android.content.Context
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import com.colin.map2gpx.map.MapRenderer   // ✅ correct import
+import com.colin.map2gpx.map.MapRenderer
 import com.colin.map2gpx.model.Waypoint
-import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
-import org.maplibre.android.maps.Style
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.geojson.Point
 
 @Composable
 fun MapViewContainer(
+    context: Context,
     waypoints: List<Waypoint>,
-    trackPoints: List<LatLng>,   // ✅ use LatLng, not Pair<Double, Double>
-    showRoute: Boolean,
+    trackPoints: List<LatLng>,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
+    var mapView: MapView? = null
 
-    // Create and retain a single MapView instance
-    val mapView = remember {
-        MapView(context).apply {
-            onCreate(Bundle())
-            onStart()
-            onResume()
-        }
-    }
-
-    // Dispose MapView when Composable leaves
-    DisposableEffect(mapView) {
-        onDispose {
-            mapView.onPause()
-            mapView.onStop()
-            mapView.onDestroy()
-        }
-    }
-
-    AndroidView(
-        modifier = modifier,
-        factory = { mapView },
-        update = { view ->
-            view.getMapAsync { map ->
-                map.setStyle(
-                    Style.Builder().fromUri("https://demotiles.maplibre.org/style.json")
-                ) {
-                    MapRenderer.renderWaypoints(context, view, waypoints)
-                    if (showRoute) {
-                        MapRenderer.renderTrack(context, view, trackPoints)
-                    }
+    Box(modifier = modifier.fillMaxSize()) {
+        AndroidView(
+            factory = { ctx ->
+                MapView(ctx).also { createdView ->
+                    mapView = createdView
+                    // Initialize base style
+                    MapRenderer.initMap(context, createdView)
                 }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Convert LatLng -> Point before rendering
+        mapView?.let { safeMapView ->
+            val trackPointsAsPoints = trackPoints.map { latLng ->
+                Point.fromLngLat(latLng.longitude, latLng.latitude)
             }
+            // Unified render call (replaces old renderWaypoints/renderTrack)
+            MapRenderer.renderAll(context, safeMapView, waypoints, trackPointsAsPoints)
         }
-    )
+    }
 }
